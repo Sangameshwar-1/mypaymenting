@@ -61,6 +61,7 @@ async function loadAuthorizedLedger() {
  ledgerLoadStarted = true;
  const requestedId = new URLSearchParams(location.search).get("id");
  personId = claims?.admin ? requestedId : claims?.personId;
+ if (!claims?.admin) document.getElementById("backBtn").style.display = "none";
  if (!personId) {
    document.getElementById("personTitle").textContent = "No person selected";
    document.getElementById("detailTransactions").innerHTML = '<p class="empty">Sign in with a personal PIN or open a person from the admin dashboard.</p>';
