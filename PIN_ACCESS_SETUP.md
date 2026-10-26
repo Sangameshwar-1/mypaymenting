@@ -25,9 +25,9 @@ The client and Cloud Functions source in this branch are proposed code. They hav
 7. Configure the JSON contents as the Firebase Secret Manager secret named `PIN_CREDENTIALS`. Expected shape: `{ "admin": { "salt": "...", "hash": "..." } }`.
 8. Review the function code and deployment diff. Then deploy the callable functions: `firebase deploy --only functions:loginWithPin,functions:setPersonPin,functions:getPersonTransactions`.
 9. Publish the reviewed client to GitHub Pages.
-10. Only after testing succeeds, deploy the reviewed Realtime Database rules with `firebase deploy --only database`. Do not deploy rules from a different branch or older version.
-11. Log in with the admin PIN and use **Set PIN** beside each person. Personal PINs must be 4–12 digits, unique, and different from the admin PIN. Share them privately.
-12. Test with the admin PIN and at least two personal PINs. Confirm that each personal login sees only its own transactions and cannot directly read another person's records or write to the database. Confirm the admin can still view and edit all existing records.
+10. Log in with the admin PIN and use **Set PIN** beside each person. Personal PINs must be 4–12 digits, unique, and different from the admin PIN. Share them privately.
+11. Deploy the reviewed Realtime Database rules with `firebase deploy --only database`. This changes access permissions, not transaction records. Do not deploy rules from a different branch or older version. Keep your exported rules backup so you can restore the previous access configuration if needed.
+12. Test with the admin PIN and at least two personal PINs after the rules are deployed. Confirm each personal login sees only its own transactions, direct reads of the shared transactions path are denied to personal users, personal writes are denied, and the admin can still view and edit all existing records. If any check fails, stop using the site and restore the prior rules configuration while troubleshooting.
 
 ## Data layout (unchanged)
 
