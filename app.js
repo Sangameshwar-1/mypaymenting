@@ -1,4 +1,4 @@
-import { db, ref, push, set, update, remove, onValue, authReady, accessClaims, auth } from "./firebase.js";
+import { db, ref, push, set, update, remove, onValue, authReady, accessClaims, auth, setPersonPin } from "./firebase.js";
 
 let people = {};
 let transactions = {};
@@ -193,6 +193,24 @@ window.addPerson = async function() {
   try { await set(push(peopleRef), { name }); input.value = ""; }
   catch (e) { alert(`Could not add person: ${e.message}`); }
 };
+window.changePersonPin = async function(id) {
+  const person = people[id];
+  if (!person) return;
+  const pin = prompt("Set a new 4–12 digit PIN for " + (person.name || "this person") + ".\nDo not reuse the admin PIN.");
+  if (pin === null) return;
+  if (!/^\\d{4,12}$/.test(pin)) return alert("PIN must contain 4–12 digits.");
+  if (pin === "1991") return alert("Please choose a PIN different from the admin PIN.");
+  const confirmPin = prompt("Re-enter the new PIN to confirm:");
+  if (confirmPin === null) return;
+  if (pin !== confirmPin) return alert("PINs do not match.");
+  try {
+    await setPersonPin(id, pin);
+    alert("PIN updated for " + (person.name || "this person") + ". Share it privately.");
+  } catch (e) {
+    alert(e.code === "functions/already-exists" ? "That PIN is already assigned to another person." : "Could not update PIN: " + (e.message || "Unknown error"));
+  }
+};
+
 window.editPerson = async function(id) {
   const person = people[id]; if (!person) return;
   const name = prompt("Edit person name:", person.name || "");
@@ -309,7 +327,7 @@ function displayPeople() {
     const x = personTotals(id), balance = x.credit - x.debit;
     const d = document.createElement("div");
     d.className = "person";
-    d.innerHTML = `<div class="person-main" onclick="window.location.href='person.html?id=${encodeURIComponent(id)}'"><div class="person-name">${escapeHtml(p.name)}</div><div class="person-balance ${balance >= 0 ? "positive" : "negative"}">${balance >= 0 ? "Receivable" : "Payable"}: ₹${formatMoney(Math.abs(balance))}</div></div><div class="person-actions"><button type="button" class="small-btn" onclick="event.stopPropagation();window.editPerson('${id}')">Edit</button><button type="button" class="small-btn danger" onclick="event.stopPropagation();window.deletePerson('${id}')">Delete</button></div>`;
+    d.innerHTML = `<div class="person-main" onclick="window.location.href='person.html?id=${encodeURIComponent(id)}'"><div class="person-name">${escapeHtml(p.name)}</div><div class="person-balance ${balance >= 0 ? "positive" : "negative"}">${balance >= 0 ? "Receivable" : "Payable"}: ₹${formatMoney(Math.abs(balance))}</div></div><div class="person-actions"><button type="button" class="small-btn" onclick="event.stopPropagation();window.editPerson('${id}')">Edit</button><button type="button" class="small-btn" onclick="event.stopPropagation();window.changePersonPin('${id}')">Set PIN</button><button type="button" class="small-btn danger" onclick="event.stopPropagation();window.deletePerson('${id}')">Delete</button></div>`;
     c.appendChild(d);
   });
 }
