@@ -5,7 +5,20 @@ const input = document.getElementById("pinInput");
 const button = document.getElementById("pinLoginButton");
 const error = document.getElementById("pinLoginError");
 
+function ensureLogoutButton() {
+  if (document.getElementById("logoutBtn")) return;
+  const header = document.querySelector(".header-inner");
+  if (!header) return;
+  const logout = document.createElement("button");
+  logout.id = "logoutBtn";
+  logout.type = "button";
+  logout.className = "logout-btn";
+  logout.textContent = "Log out";
+  logout.addEventListener("click", async () => { await signOut(auth); location.replace("index.html"); });
+  header.appendChild(logout);
+}
 function showAdmin() {
+  ensureLogoutButton();
   document.body.classList.add("authenticated");
   document.getElementById("loginGate")?.setAttribute("hidden", "");
   window.dispatchEvent(new Event("mypayments-authenticated"));
@@ -22,6 +35,7 @@ async function resumeSession(user) {
     if (!location.pathname.endsWith("person.html")) {
       location.replace("person.html");
     } else {
+      ensureLogoutButton();
       document.body.classList.add("authenticated");
       document.getElementById("loginGate")?.setAttribute("hidden", "");
       window.dispatchEvent(new CustomEvent("mypayments-person-authenticated", { detail: { personId: claims.personId } }));
