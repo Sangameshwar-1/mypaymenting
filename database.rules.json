@@ -9,6 +9,7 @@
         }
       },
       "ledgers": {
+        ".read": "auth != null && auth.token.admin === true",
         "$personId": {
           ".read": "auth != null && (auth.token.admin === true || auth.token.personId === $personId)",
           ".write": "auth != null && auth.token.admin === true"
