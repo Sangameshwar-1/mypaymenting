@@ -1,4 +1,4 @@
-import { db, ref, onValue, authReady, accessClaims, signOut, auth } from "./firebase.js";
+import { db, ref, onValue, authReady, accessClaims, getPersonTransactions, signOut, auth } from "./firebase.js";
 
 let personId = null;
 let person = null;
@@ -68,7 +68,14 @@ async function loadAuthorizedLedger() {
    return;
  }
  onValue(ref(db,"mypayments/people/"+personId),s=>{person=s.val()||null;render();});
- onValue(ref(db,"mypayments/ledgers/"+personId+"/transactions"),s=>{transactions=s.val()||{};render();});
+ try {
+   const result = await getPersonTransactions(personId);
+   transactions = result.transactions || {};
+   render();
+ } catch (error) {
+   console.error("Could not load authorized transactions:", error);
+   document.getElementById("detailTransactions").innerHTML = '<p class="empty">Could not load this ledger. Please refresh and try again.</p>';
+ }
 }
 window.addEventListener("mypayments-person-authenticated", loadAuthorizedLedger);
 authReady.then(user=>{if(user)loadAuthorizedLedger();}).catch(console.error);
