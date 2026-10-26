@@ -53,8 +53,8 @@ document.getElementById("backBtn").addEventListener("click",()=>location.replace
 document.getElementById("detailPdfBtn").addEventListener("click",exportPdf);
 
 async function loadAuthorizedLedger() {
- const user = await authReady;
- if (!user) return;
+ await authReady;
+ if (!auth.currentUser) return;
  const claims = await accessClaims();
  const requestedId = new URLSearchParams(location.search).get("id");
  personId = claims?.admin ? requestedId : claims?.personId;
