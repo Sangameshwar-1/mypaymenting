@@ -9,14 +9,16 @@
 </head>
 <body>
 <section id="loginGate" class="login-gate">
-  <form id="pinLoginForm" class="login-card">
+  <form id="emailLoginForm" class="login-card">
     <div class="eyebrow">PRIVATE ACCESS</div>
     <h1>My Payments</h1>
-    <p>Enter your personal PIN to view your ledger.</p>
-    <label for="pinInput">PIN</label>
-    <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]{4,12}" minlength="4" maxlength="12" autocomplete="current-password" required placeholder="4–12 digit PIN">
-    <button id="pinLoginButton" class="primary-btn" type="submit">Continue</button>
-    <p id="pinLoginError" class="login-error" role="alert" aria-live="polite"></p>
+    <p>Sign in with your assigned email and password.</p>
+    <label for="emailInput">Email</label>
+    <input id="emailInput" type="email" autocomplete="username" required placeholder="you@example.com">
+    <label for="passwordInput">Password</label>
+    <input id="passwordInput" type="password" autocomplete="current-password" required placeholder="Password">
+    <button id="emailLoginButton" class="primary-btn" type="submit">Sign in</button>
+    <p id="emailLoginError" class="login-error" role="alert" aria-live="polite"></p>
   </form>
 </section>
 <header><div class="header-inner"><div><div class="eyebrow">PERSONAL FINANCE</div><h1>My Payments</h1><p>Track credits, debits and outstanding balances</p></div><button id="downloadPdfBtn" type="button" class="header-pdf">Download PDF</button></div></header>
@@ -50,6 +52,6 @@
 <div id="editOtherTypeWrap"><label>Other type</label><input id="editOtherType" placeholder="Enter type"></div><div><label>Platform</label><select id="editPlatform"><option>PhonePe</option><option>GPay</option><option>WhatsApp</option><option>Paytm</option><option>Amazon Pay</option><option>Bank Transfer</option><option>Cash</option><option>Other</option></select></div>
 <div id="editOtherPlatformWrap"><label>Other platform</label><input id="editOtherPlatform" placeholder="Enter platform"></div><div><label>Amount</label><input type="number" id="editAmount" min="0" step="0.01"></div><div><label>Amount comment</label><input id="editAmountComment"></div><div><label>Purpose</label><input id="editPurpose"></div><div><label>Total comment</label><input id="editDescription"></div>
 </div><div class="charge-box"><div class="charge-title"><div><strong>Charges</strong><span class="section-note">Optional</span></div><button type="button" id="addEditChargeBtn" class="small-btn">+ Add charge</button></div><div class="charge-head"><span>Method</span><span>Value</span><span>Included?</span><span>Comment</span><span></span></div><div id="editChargesList"></div><div id="editChargePreview" class="charge-preview">Charges: ₹0 • Total: ₹0</div></div></div><div class="modal-footer"><button type="button" id="cancelEditBtn2" class="secondary-btn">Cancel</button><button type="button" id="saveEditBtn" class="primary-btn">Save changes</button></div></div></div>
-<script type="module" src="app.js?v=9"></script>
-<script type="module" src="login.js?v=1"></script>
+<script type="module" src="app.js?v=10"></script>
+<script type="module" src="login.js?v=2"></script>
 </body></html>
