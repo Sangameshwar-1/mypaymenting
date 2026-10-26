@@ -57,7 +57,7 @@ async function makeCredential(label) {
   if (!Number.isInteger(count) || count < 1 || count > 500) throw new Error("Enter a count from 1 to 500.");
   for (let i = 0; i < count; i++) {
     const personId = (await ask(`Person #${i + 1} database ID (not display name): `)).trim();
-    if (!personId || /[.#$\[\]/]/.test(personId) || credentials.people[personId]) throw new Error("Invalid or duplicate person ID.");
+    if (!personId || [".", "#", "$", "[", "]", "/"].some(ch => personId.includes(ch)) || credentials.people[personId]) throw new Error("Invalid or duplicate person ID.");
     credentials.people[personId] = await makeCredential(`Person ${personId}`);
   }
   const output = "pin-credentials.local.json";
