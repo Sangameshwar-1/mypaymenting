@@ -5,7 +5,7 @@
 - Admin PIN: read and manage all people and all ledgers.
 - Each personal PIN: read-only access to exactly one person's ledger and their own person record.
 - No email/password account form; PINs are verified by a trusted Firebase Cloud Function.
-- The browser never receives the PIN list or PIN hashes.
+- The browser never receives PIN hashes. After logging in with the admin PIN, use the **Set PIN** button beside a person to create or reset that person's PIN. Personal PIN hashes are stored under the rules-protected `security/pinCredentials/people` path.
 
 ## Important: this branch is not live yet
 
@@ -18,14 +18,14 @@ The implementation is on `feature/secure-pin-access`. Do not deploy the new data
 3. Firebase Functions deployment may require the project's Blaze billing plan. Check billing before deployment.
 4. Install Firebase CLI locally and log in with an account that can deploy Functions and Database Rules.
 5. From a local clone of this branch, run `npm install --prefix functions`.
-6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. It asks for the admin PIN, then each person's **database ID** and personal PIN. PIN entry is hidden. Choose unique 6–12 digit PINs. Do not paste real PINs into GitHub or chat.
+6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. It asks only for the admin PIN. Enter `1991` in your local terminal when prompted; the input is hidden. For the admin PIN, enter `1991` when prompted (the hash is generated locally and the PIN is not committed). This PIN is only four digits, so anyone who learns it can access all records; use it only if you accept that risk. Do not paste real PINs into GitHub or chat.
 7. The utility writes `pin-credentials.local.json`. This file is ignored by Git. Keep it private and do not upload or commit it.
-8. Set the JSON file contents as the Firebase Secret Manager secret named `PIN_CREDENTIALS` using the Firebase CLI's secret-setting prompt. The JSON shape is `{ "admin": { "salt": "...", "hash": "..." }, "people": { "PERSON_DATABASE_ID": { "salt": "...", "hash": "..." } } }`. The utility stores only salted scrypt hashes, not the original PINs.
+8. Set the JSON file contents as the Firebase Secret Manager secret named `PIN_CREDENTIALS` using the Firebase CLI's secret-setting prompt. The JSON shape is `{ "admin": { "salt": "...", "hash": "..." } }`. The utility stores only the salted scrypt hash, not the original PIN.
 9. Dry-run the ledger migration with a service account that has database admin access:
    `GOOGLE_APPLICATION_CREDENTIALS=/secure/path/service-account.json node scripts/migrate-ledgers.js`
    Review the generated local backup and per-person counts. The script stops if a transaction references an unknown person ID or a ledger already exists.
 10. After reviewing the backup and dry-run output, run the same command with `--apply`. It copies each existing transaction to `mypayments/ledgers/{personId}/transactions/{transactionId}` and leaves the old records intact.
-11. Deploy the function first: `firebase deploy --only functions:loginWithPin`.
+11. Deploy both callable functions: `firebase deploy --only functions:loginWithPin,functions:setPersonPin`.
 12. Test PIN login in a non-production test session. Verify a personal token has only the `personId` claim and admin has only `admin: true`.
 13. Publish the updated client and only then deploy `database.rules.json`: `firebase deploy --only database`. The rules deny personal reads of the legacy shared transactions collection and grant access to only the authenticated person's ledger.
 14. Test with two different personal PINs and the admin PIN. For each person, directly attempt to read a different person's `mypayments/ledgers/OTHER_ID` path in the Firebase SDK; it must return permission denied. Also test that signed-out access is denied.
@@ -40,5 +40,5 @@ The implementation is on `feature/secure-pin-access`. Do not deploy the new data
 
 - Realtime Database rules enforce privacy; hiding other people's rows in JavaScript alone is not security.
 - PIN hashes and the admin SDK service-account key must never be committed.
-- The function rate-limits repeated failures by source IP. For stronger protection, enable Firebase App Check and monitor authentication/function abuse.
+- The login function rate-limits repeated failures by source IP. Personal PINs must be unique and different from the admin PIN. For stronger protection, enable Firebase App Check and monitor authentication/function abuse.
 - This branch has not been deployed or tested against the live database. Do not use real PINs until deployment and cross-account tests are complete.
