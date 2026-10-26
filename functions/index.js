@@ -96,6 +96,45 @@ exports.loginWithPin = onCall(
   }
 );
 
+// Reads the existing shared transaction collection without moving or copying records.
+exports.getPersonTransactions = onCall(
+  { enforceAppCheck: false, maxInstances: 5 },
+  async (request) => {
+    const claims = request.auth?.token;
+    if (!claims || (claims.admin !== true && typeof claims.personId !== "string")) {
+      throw new HttpsError("unauthenticated", "Sign in with your PIN first.");
+    }
+
+    const requestedPersonId = request.data?.personId;
+    let personId;
+    if (claims.admin === true) {
+      if (typeof requestedPersonId !== "string" || !requestedPersonId ||
+          [".", "#", "$", "[", "]", "/"].some(ch => requestedPersonId.includes(ch))) {
+        throw new HttpsError("invalid-argument", "A valid person ID is required.");
+      }
+      personId = requestedPersonId;
+    } else {
+      // Never trust a person ID supplied by a personal session.
+      personId = claims.personId;
+    }
+
+    const [personSnap, transactionsSnap] = await Promise.all([
+      getDatabase().ref("mypayments/people/" + personId).get(),
+      getDatabase().ref("mypayments/transactions").get()
+    ]);
+    if (!personSnap.exists()) throw new HttpsError("not-found", "Person not found.");
+
+    const allTransactions = transactionsSnap.val() || {};
+    const transactions = {};
+    for (const [transactionId, transaction] of Object.entries(allTransactions)) {
+      if (transaction && transaction.personId === personId) {
+        transactions[transactionId] = transaction;
+      }
+    }
+    return { personId, transactions };
+  }
+);
+
 exports.setPersonPin = onCall(
   { secrets: [PIN_CREDENTIALS], enforceAppCheck: false, maxInstances: 5 },
   async (request) => {
