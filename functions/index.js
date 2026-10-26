@@ -59,8 +59,8 @@ exports.loginWithPin = onCall(
   { secrets: [PIN_CREDENTIALS], enforceAppCheck: false, maxInstances: 5 },
   async (request) => {
     const pin = request.data?.pin;
-    if (typeof pin !== "string" || !/^\d{6,12}$/.test(pin)) {
-      throw new HttpsError("invalid-argument", "Enter a 6–12 digit PIN.");
+    if (typeof pin !== "string" || !/^\d{4,12}$/.test(pin)) {
+      throw new HttpsError("invalid-argument", "Enter a 4–12 digit PIN.");
     }
 
     const key = requestKey(request);
@@ -77,13 +77,10 @@ exports.loginWithPin = onCall(
     if (await verifyPin(pin, credentials.admin)) {
       claims = { admin: true };
     } else {
-      const people = credentials.people || {};
-      // Person IDs are server-side keys; they are never supplied by the client.
+      const peopleSnap = await getDatabase().ref("security/pinCredentials/people").get();
+      const people = peopleSnap.val() || {};
       for (const [personId, credential] of Object.entries(people)) {
-        if (await verifyPin(pin, credential)) {
-          claims = { personId };
-          break;
-        }
+        if (await verifyPin(pin, credential)) { claims = { personId }; break; }
       }
     }
 
@@ -96,5 +93,35 @@ exports.loginWithPin = onCall(
     const uid = claims.admin ? "mypayments-admin" : "mypayments-person-" + claims.personId;
     const customToken = await getAuth().createCustomToken(uid, claims);
     return { token: customToken, role: claims.admin ? "admin" : "person" };
+  }
+);
+
+exports.setPersonPin = onCall(
+  { enforceAppCheck: false, maxInstances: 5 },
+  async (request) => {
+    if (request.auth?.token?.admin !== true) {
+      throw new HttpsError("permission-denied", "Only the admin can change personal PINs.");
+    }
+    const personId = request.data?.personId;
+    const pin = request.data?.pin;
+    if (typeof personId !== "string" || !personId || [".", "#", "$", "[", "]", "/"].some(ch => personId.includes(ch))) {
+      throw new HttpsError("invalid-argument", "Invalid person ID.");
+    }
+    if (typeof pin !== "string" || !/^\d{4,12}$/.test(pin)) {
+      throw new HttpsError("invalid-argument", "Enter a 4–12 digit PIN.");
+    }
+    const personSnap = await getDatabase().ref("mypayments/people/" + personId).get();
+    if (!personSnap.exists()) throw new HttpsError("not-found", "That person does not exist.");
+    const existingSnap = await getDatabase().ref("security/pinCredentials/people").get();
+    const existing = existingSnap.val() || {};
+    for (const [otherId, credential] of Object.entries(existing)) {
+      if (otherId !== personId && await verifyPin(pin, credential)) {
+        throw new HttpsError("already-exists", "Each person must have a unique PIN.");
+      }
+    }
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = (await scrypt(pin, salt, 64)).toString("hex");
+    await getDatabase().ref("security/pinCredentials/people/" + personId).set({ salt, hash });
+    return { success: true };
   }
 );
