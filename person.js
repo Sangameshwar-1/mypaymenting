@@ -20,7 +20,14 @@ function sortValue(t){return (t.date||"0000-00-00")+"T"+(t.time||"00:00");}
 
 async function refreshAuthorizedTransactions() {
  if (!personId || !auth.currentUser) return;
- await refreshAuthorizedTransactions();
+ try {
+   const result = await getPersonTransactions(personId);
+   transactions = result.transactions || {};
+   render();
+ } catch (error) {
+   console.error("Could not load authorized transactions:", error);
+   document.getElementById("detailTransactions").innerHTML = '<p class="empty">Could not load this ledger. Please refresh and try again.</p>';
+ }
 }
 
 function render(){
@@ -73,14 +80,7 @@ async function loadAuthorizedLedger() {
    return;
  }
  onValue(ref(db,"mypayments/people/"+personId),s=>{person=s.val()||null;render();});
- try {
-   const result = await getPersonTransactions(personId);
-   transactions = result.transactions || {};
-   render();
- } catch (error) {
-   console.error("Could not load authorized transactions:", error);
-   document.getElementById("detailTransactions").innerHTML = '<p class="empty">Could not load this ledger. Please refresh and try again.</p>';
- }
+ await refreshAuthorizedTransactions();
 }
 window.addEventListener("mypayments-person-authenticated", loadAuthorizedLedger);
 authReady.then(user=>{if(user)loadAuthorizedLedger();}).catch(console.error);
