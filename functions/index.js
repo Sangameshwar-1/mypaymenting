@@ -97,7 +97,7 @@ exports.loginWithPin = onCall(
 );
 
 exports.setPersonPin = onCall(
-  { enforceAppCheck: false, maxInstances: 5 },
+  { secrets: [PIN_CREDENTIALS], enforceAppCheck: false, maxInstances: 5 },
   async (request) => {
     if (request.auth?.token?.admin !== true) {
       throw new HttpsError("permission-denied", "Only the admin can change personal PINs.");
@@ -109,6 +109,10 @@ exports.setPersonPin = onCall(
     }
     if (typeof pin !== "string" || !/^\d{4,12}$/.test(pin)) {
       throw new HttpsError("invalid-argument", "Enter a 4–12 digit PIN.");
+    }
+    const credentials = JSON.parse(PIN_CREDENTIALS.value());
+    if (await verifyPin(pin, credentials.admin)) {
+      throw new HttpsError("invalid-argument", "A personal PIN must be different from the admin PIN.");
     }
     const personSnap = await getDatabase().ref("mypayments/people/" + personId).get();
     if (!personSnap.exists()) throw new HttpsError("not-found", "That person does not exist.");
