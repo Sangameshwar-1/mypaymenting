@@ -2,16 +2,18 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Person Details - My Payments</title><link rel="stylesheet" href="style.css?v=9"><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script></head>
 <body>
 <section id="loginGate" class="login-gate">
-  <form id="pinLoginForm" class="login-card">
+  <form id="emailLoginForm" class="login-card">
     <div class="eyebrow">PRIVATE ACCESS</div>
     <h1>My Payments</h1>
-    <p>Enter your personal PIN to view your ledger.</p>
-    <label for="pinInput">PIN</label>
-    <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]{4,12}" minlength="4" maxlength="12" autocomplete="current-password" required placeholder="4–12 digit PIN">
-    <button id="pinLoginButton" class="primary-btn" type="submit">Continue</button>
-    <p id="pinLoginError" class="login-error" role="alert" aria-live="polite"></p>
+    <p>Sign in with your assigned email and password.</p>
+    <label for="emailInput">Email</label>
+    <input id="emailInput" type="email" autocomplete="username" required placeholder="you@example.com">
+    <label for="passwordInput">Password</label>
+    <input id="passwordInput" type="password" autocomplete="current-password" required placeholder="Password">
+    <button id="emailLoginButton" class="primary-btn" type="submit">Sign in</button>
+    <p id="emailLoginError" class="login-error" role="alert" aria-live="polite"></p>
   </form>
 </section><header><div class="header-inner"><div><div class="eyebrow">PERSONAL FINANCE</div><h1 id="personTitle">Person Details</h1><p>Detailed payment ledger</p></div><button id="detailPdfBtn" type="button" class="header-pdf">Download PDF</button></div></header>
 <main><div class="detail-actions"><button id="backBtn" class="secondary-btn">← Back</button></div><section class="summary"><div class="card credit-card"><span>Received</span><strong id="detailReceived" class="taken-text">₹0</strong></div><div class="card debit-card"><span>Repaid</span><strong id="detailRepaid" class="repaid-text">₹0</strong></div><div class="card balance-card"><span>Balance</span><strong id="detailBalance">₹0</strong></div></section>
 <section class="box"><div class="section-header"><div><h2>Transactions</h2><p>Full transaction history for this person.</p></div></div><div id="detailTransactions">Loading...</div></section></main>
-<script type="module" src="person.js?v=9"></script><script type="module" src="login.js?v=1"></script></body></html>
+<script type="module" src="person.js?v=10"></script><script type="module" src="login.js?v=2"></script></body></html>
