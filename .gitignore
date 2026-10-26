@@ -1,0 +1,9 @@
+# Local secrets and Firebase service credentials
+pin-credentials.local.json
+service-account*.json
+*-firebase-adminsdk-*.json
+.env
+.env.*
+node_modules/
+functions/node_modules/
+.firebase/
