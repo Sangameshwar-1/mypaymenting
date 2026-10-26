@@ -2,25 +2,34 @@
   "rules": {
     "mypayments": {
       "people": {
-        ".read": "auth != null && auth.token.admin === true",
-        ".write": "auth != null && auth.token.admin === true",
+        ".read": "auth != null && root.child('security/access').child(auth.uid).child('admin').val() === true",
+        ".write": "auth != null && root.child('security/access').child(auth.uid).child('admin').val() === true",
         "$personId": {
-          ".read": "auth != null && (auth.token.admin === true || auth.token.personId === $personId)"
+          ".read": "auth != null && (root.child('security/access').child(auth.uid).child('admin').val() === true || root.child('security/access').child(auth.uid).child('personId').val() === $personId)"
         }
       },
       "ledgers": {
-        ".read": "auth != null && auth.token.admin === true",
+        ".read": "auth != null && root.child('security/access').child(auth.uid).child('admin').val() === true",
         "$personId": {
-          ".read": "auth != null && (auth.token.admin === true || auth.token.personId === $personId)",
-          ".write": "auth != null && auth.token.admin === true"
+          ".read": "auth != null && (root.child('security/access').child(auth.uid).child('admin').val() === true || root.child('security/access').child(auth.uid).child('personId').val() === $personId)",
+          ".write": "auth != null && root.child('security/access').child(auth.uid).child('admin').val() === true"
         }
       },
       "transactions": {
-        ".read": "auth != null && auth.token.admin === true",
-        ".write": "auth != null && auth.token.admin === true"
+        ".read": "auth != null && (root.child('security/access').child(auth.uid).child('admin').val() === true || (query.orderByChild === 'personId' && query.equalTo === root.child('security/access').child(auth.uid).child('personId').val()))",
+        ".write": "auth != null && root.child('security/access').child(auth.uid).child('admin').val() === true",
+        ".indexOn": [
+          "personId"
+        ]
       }
     },
     "security": {
+      "access": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || root.child('security/access').child(auth.uid).child('admin').val() === true)",
+          ".write": false
+        }
+      },
       ".read": false,
       ".write": false
     }
