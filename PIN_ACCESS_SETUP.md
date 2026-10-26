@@ -18,9 +18,10 @@ The implementation is on `feature/secure-pin-access`. Do not deploy the new data
 3. Firebase Functions deployment may require the project's Blaze billing plan. Check billing before deployment.
 4. Install Firebase CLI locally and log in with an account that can deploy Functions and Database Rules.
 5. From a local clone of this branch, run `npm install --prefix functions`.
-6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. It asks only for the admin PIN. Enter `1991` in your local terminal when prompted; the input is hidden. For the admin PIN, enter `1991` when prompted (the hash is generated locally and the PIN is not committed). This PIN is only four digits, so anyone who learns it can access all records; use it only if you accept that risk. Do not paste real PINs into GitHub or chat.
-7. The utility writes `pin-credentials.local.json`. This file is ignored by Git. Keep it private and do not upload or commit it.
+6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. It asks for the admin PIN. Enter `1991` in your local terminal when prompted; the input is hidden and only a salted hash is saved. The PIN is only four digits, so anyone who learns it can access all records. Do not paste real PINs into GitHub or chat.
+7. The utility writes `pin-credentials.local.json` containing the admin hash only. This file is ignored by Git; keep it private and do not upload or commit it.
 8. Set the JSON file contents as the Firebase Secret Manager secret named `PIN_CREDENTIALS` using the Firebase CLI's secret-setting prompt. The JSON shape is `{ "admin": { "salt": "...", "hash": "..." } }`. The utility stores only the salted scrypt hash, not the original PIN.
+9. After publishing and deploying the functions, log in with the admin PIN and use **Set PIN** beside each person to create their personal PIN. Personal PINs are 4–12 digits, must be unique, and must differ from the admin PIN. Share each PIN privately.
 9. Dry-run the ledger migration with a service account that has database admin access:
    `GOOGLE_APPLICATION_CREDENTIALS=/secure/path/service-account.json node scripts/migrate-ledgers.js`
    Review the generated local backup and per-person counts. The script stops if a transaction references an unknown person ID or a ledger already exists.
