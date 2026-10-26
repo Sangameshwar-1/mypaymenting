@@ -41,8 +41,8 @@ function ask(prompt, hidden = false) {
 }
 
 async function makeCredential(label) {
-  const pin = await ask(`${label} PIN (6–12 digits, input hidden): `, true);
-  if (!/^\d{6,12}$/.test(pin)) throw new Error("PIN must contain 6–12 digits.");
+  const pin = await ask(`${label} PIN (4–12 digits, input hidden): `, true);
+  if (!/^\d{4,12}$/.test(pin)) throw new Error("PIN must contain 4–12 digits.");
   if (seenPins.has(pin)) throw new Error("PINs must be unique; choose a different PIN.");
   seenPins.add(pin);
   const salt = crypto.randomBytes(16).toString("hex");
@@ -51,15 +51,7 @@ async function makeCredential(label) {
 }
 
 (async () => {
-  const credentials = { admin: await makeCredential("Admin"), people: {} };
-  const countText = await ask("How many people need PINs? ");
-  const count = Number(countText);
-  if (!Number.isInteger(count) || count < 1 || count > 500) throw new Error("Enter a count from 1 to 500.");
-  for (let i = 0; i < count; i++) {
-    const personId = (await ask(`Person #${i + 1} database ID (not display name): `)).trim();
-    if (!personId || [".", "#", "$", "[", "]", "/"].some(ch => personId.includes(ch)) || credentials.people[personId]) throw new Error("Invalid or duplicate person ID.");
-    credentials.people[personId] = await makeCredential(`Person ${personId}`);
-  }
+  const credentials = { admin: await makeCredential("Admin") };
   const output = "pin-credentials.local.json";
   fs.writeFileSync(output, JSON.stringify(credentials, null, 2), { mode: 0o600, flag: "wx" });
   console.log(`Created ${output}. It contains hashes only. Do not commit or share it.`);
