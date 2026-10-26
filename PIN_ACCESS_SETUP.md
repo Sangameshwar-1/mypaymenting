@@ -12,22 +12,24 @@ This implementation uses the existing Realtime Database structure. **Do not run 
 
 ## Important status
 
-The client and Cloud Functions source in this branch are proposed code. They have not been deployed to Firebase. The Firebase database and rules must remain unchanged until you review and test the implementation. GitHub Pages deployment alone does not activate the callable functions.
+The PIN-access source changes are merged into `main`. The GitHub Pages workflow is configured to run on pushes to `main`, but confirm its latest run in GitHub Actions before assuming the website is updated. **Firebase Cloud Functions and Realtime Database rules have not been deployed as part of this repository change.** Until those are deployed and tested, do not assume PIN-based isolation is active for real payment data. GitHub Pages deployment alone does not activate the callable functions.
+
+No transaction migration is required. Existing transaction records should remain at `mypayments/transactions/{transactionId}`.
 
 ## Firebase setup
 
 1. Export a backup from Firebase Console for project `blood-7b054` before making any Firebase changes. This is a precaution; the proposed code does not perform a data migration.
 2. Confirm Firebase Authentication and Realtime Database are enabled. PIN login uses Firebase custom tokens.
 3. Check that the Firebase project has the billing plan required for Cloud Functions.
-4. Clone this repository and check out the reviewed branch. Install the Firebase CLI and authenticate with an account authorized to deploy Functions and Database Rules.
+4. Clone this repository and check out the latest `main` branch. Install the Firebase CLI and authenticate with an account authorized to deploy Functions and Database Rules.
 5. Run `npm install --prefix functions`.
-6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. Enter the admin PIN `1991` only in that terminal when prompted. The script stores a salted scrypt hash in an ignored local file; never commit or share the PIN, hash file, or service-account key.
+6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. Enter the admin PIN only in that terminal when prompted. The script stores a salted scrypt hash in an ignored local file; never commit or share the PIN, hash file, or service-account key.
 7. Configure the JSON contents as the Firebase Secret Manager secret named `PIN_CREDENTIALS`. Expected shape: `{ "admin": { "salt": "...", "hash": "..." } }`.
 8. Review the function code and deployment diff. Then deploy the callable functions: `firebase deploy --only functions:loginWithPin,functions:setPersonPin,functions:getPersonTransactions`.
-9. Publish the reviewed client to GitHub Pages.
+9. Open the repository's Actions page and confirm the **Deploy to GitHub Pages** workflow succeeded for the latest `main` commit. The workflow is configured to publish automatically; do not assume it succeeded without checking.
 10. Log in with the admin PIN and use **Set PIN** beside each person. Personal PINs must be 4–12 digits, unique, and different from the admin PIN. Share them privately.
 11. Deploy the reviewed Realtime Database rules with `firebase deploy --only database`. This changes access permissions, not transaction records. Do not deploy rules from a different branch or older version. Keep your exported rules backup so you can restore the previous access configuration if needed.
-12. Test with the admin PIN and at least two personal PINs after the rules are deployed. Confirm each personal login sees only its own transactions, direct reads of the shared transactions path are denied to personal users, personal writes are denied, and the admin can still view and edit all existing records. If any check fails, stop using the site and restore the prior rules configuration while troubleshooting.
+12. Test with the admin PIN and at least two personal PINs after the functions and rules are deployed. Confirm each personal login sees only its own transactions, direct reads of the shared transactions path are denied to personal users, personal writes are denied, and the admin can still view and edit all existing records. If any check fails, stop using the site and restore the prior rules configuration while troubleshooting.
 
 ## Data layout (unchanged)
 
