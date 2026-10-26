@@ -5,7 +5,6 @@ let transactions = {};
 let editingTransactionId = null;
 
 const peopleRef = ref(db, "mypayments/people");
-const ledgersRef = ref(db, "mypayments/ledgers");
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -232,7 +231,7 @@ window.deletePerson = async function(id) {
 };
 window.deleteTransaction = async id => {
   if (!confirm("Delete this transaction permanently?")) return;
-  try { const t = transactions[id]; if (!t?.personId) throw new Error("Transaction not found."); await remove(ref(db, `mypayments/ledgers/${t.personId}/transactions/${id}`)); }
+  try { const t = transactions[id]; if (!t?.personId) throw new Error("Transaction not found."); await remove(ref(db, `mypayments/transactions/${id}`)); }
   catch (e) { alert(`Could not delete transaction: ${e.message}`); }
 };
 window.editTransaction = function(id) {
@@ -292,12 +291,7 @@ window.saveEditedTransaction = async function() {
       description: document.getElementById("editDescription").value.trim(),
       charges: getEditCharges()
     };
-    if (oldTransaction.personId !== nextPersonId) {
-      await set(ref(db, `mypayments/ledgers/${nextPersonId}/transactions/${editingTransactionId}`), nextTransaction);
-      await remove(ref(db, `mypayments/ledgers/${oldTransaction.personId}/transactions/${editingTransactionId}`));
-    } else {
-      await update(ref(db, `mypayments/ledgers/${nextPersonId}/transactions/${editingTransactionId}`), nextTransaction);
-    }
+    await update(ref(db, `mypayments/transactions/${editingTransactionId}`), nextTransaction);
     closeEditModal();
   } catch (e) { alert(`Could not save changes: ${e.message}`); }
 };
@@ -435,12 +429,9 @@ async function bootAdmin() {
   adminBooted = true;
   document.body.classList.add("authenticated");
   onValue(peopleRef, snapshot => { people = snapshot.val() || {}; updatePersonDropdowns(); displayPeople(); displayTransactions(); updateDashboard(); });
-  onValue(ledgersRef, snapshot => {
-    transactions = {};
-    const ledgers = snapshot.val() || {};
-    Object.entries(ledgers).forEach(([personId, ledger]) => {
-      Object.entries(ledger?.transactions || {}).forEach(([txId, tx]) => { transactions[txId] = { ...tx, personId: tx.personId || personId }; });
-    });
+  // Continue using the original shared collection; no migration is required.
+  onValue(ref(db, "mypayments/transactions"), snapshot => {
+    transactions = snapshot.val() || {};
     displayPeople(); displayTransactions(); updateDashboard();
   });
 }
@@ -461,7 +452,7 @@ document.getElementById("transactionForm").addEventListener("submit", async even
   if (type === "other" && !otherType) return alert("Enter other type");
   if (platform === "Other" && !otherPlatform) return alert("Enter other platform");
   try {
-    await set(push(ref(db, `mypayments/ledgers/${personId}/transactions`)), {
+    await set(push(ref(db, "mypayments/transactions")), {
       personId,date,time,type,
       otherType: type === "other" ? otherType : "",
       amount,
