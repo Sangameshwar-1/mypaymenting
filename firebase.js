@@ -1,10 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import { getDatabase, ref, push, set as dbSet, update as dbUpdate, remove as dbRemove, onValue as dbOnValue } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
-import { getAuth, onAuthStateChanged, signInWithCustomToken, signOut, getIdTokenResult } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
+import { getDatabase, ref, push, set as dbSet, update as dbUpdate, remove as dbRemove, onValue as dbOnValue, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdTokenResult } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAHt06CtReHyQRip-QqEGILFjOWH5cI98c",
+  apiKey: "AIzaSyAHt06CtReHyQRip-QqEGILFjOWH5cI98",
   authDomain: "blood-7b054.firebaseapp.com",
   databaseURL: "https://blood-7b054-default-rtdb.firebaseio.com",
   projectId: "blood-7b054",
@@ -17,49 +16,48 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-const functions = getFunctions(app, "us-central1");
 const authReady = new Promise((resolve, reject) => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    unsubscribe();
-    resolve(user);
-  }, reject);
+  const unsubscribe = onAuthStateChanged(auth, user => { unsubscribe(); resolve(user); }, reject);
 });
 
-async function loginWithPin(pin) {
-  const loginCall = httpsCallable(functions, "loginWithPin");
-  const response = await loginCall({ pin });
-  await signInWithCustomToken(auth, response.data.token);
-  return getIdTokenResult(auth.currentUser, true);
-}
-async function getPersonTransactions(personId) {
-  const call = httpsCallable(functions, "getPersonTransactions");
-  const response = await call({ personId });
-  return response.data;
-}
-async function setPersonPin(personId, pin) {
-  const call = httpsCallable(functions, "setPersonPin");
-  const response = await call({ personId, pin });
-  return response.data;
+async function loginWithEmail(email, password) {
+  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+  const claims = await accessClaims();
+  if (!claims || (!claims.admin && !claims.personId)) {
+    await signOut(auth);
+    throw new Error("This account has not been assigned My Payments access. Ask the administrator to finish setup.");
+  }
+  return { user: credential.user, claims };
 }
 async function accessClaims() {
   if (!auth.currentUser) return null;
-  return (await getIdTokenResult(auth.currentUser, true)).claims;
+  const snap = await get(ref(db, "security/access/" + auth.currentUser.uid));
+  return snap.exists() ? snap.val() : null;
 }
 async function requireAuth() {
   await authReady;
-  if (!auth.currentUser) throw new Error("Please sign in with your PIN first.");
+  if (!auth.currentUser) throw new Error("Please sign in first.");
 }
 const set = async (...args) => { await requireAuth(); return dbSet(...args); };
 const update = async (...args) => { await requireAuth(); return dbUpdate(...args); };
 const remove = async (...args) => { await requireAuth(); return dbRemove(...args); };
 const onValue = (databaseRef, callback, errorCallback) => {
   authReady.then(() => {
-    if (!auth.currentUser) throw new Error("PIN login required.");
+    if (!auth.currentUser) throw new Error("Sign-in required.");
     dbOnValue(databaseRef, callback, errorCallback);
-  }).catch((error) => {
+  }).catch(error => {
     console.error("Firebase database listener could not start:", error);
     if (errorCallback) errorCallback(error);
   });
 };
-
-export { db, auth, authReady, ref, push, set, update, remove, onValue, loginWithPin, setPersonPin, getPersonTransactions, accessClaims, signOut };
+async function getPersonTransactions(personId) {
+  await requireAuth();
+  const claims = await accessClaims();
+  if (!claims?.admin && claims?.personId !== personId) throw new Error("You cannot view this ledger.");
+  const target = claims.admin
+    ? ref(db, "mypayments/transactions")
+    : query(ref(db, "mypayments/transactions"), orderByChild("personId"), equalTo(claims.personId));
+  const snapshot = await get(target);
+  return { transactions: snapshot.val() || {} };
+}
+export { db, auth, authReady, ref, push, set, update, remove, onValue, loginWithEmail, getPersonTransactions, accessClaims, signOut };
