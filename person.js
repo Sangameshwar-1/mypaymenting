@@ -2,6 +2,7 @@ import { db, ref, onValue, authReady, accessClaims, signOut, auth } from "./fire
 
 let personId = null;
 let person = null;
+let ledgerLoadStarted = false;
 let transactions = {};
 
 function formatMoney(n){return Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:0,maximumFractionDigits:2});}
@@ -53,9 +54,11 @@ document.getElementById("backBtn").addEventListener("click",()=>location.replace
 document.getElementById("detailPdfBtn").addEventListener("click",exportPdf);
 
 async function loadAuthorizedLedger() {
+ if (ledgerLoadStarted) return;
  await authReady;
  if (!auth.currentUser) return;
  const claims = await accessClaims();
+ ledgerLoadStarted = true;
  const requestedId = new URLSearchParams(location.search).get("id");
  personId = claims?.admin ? requestedId : claims?.personId;
  if (!personId) {
