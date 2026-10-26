@@ -18,6 +18,11 @@ function chargeText(c,base){const v=chargeValue(c,base);return c.kind==="percent
 function fallbackTime(t){if(t.time)return t.time;if(t.createdAt){const d=new Date(t.createdAt);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}return "00:00";}
 function sortValue(t){return (t.date||"0000-00-00")+"T"+(t.time||"00:00");}
 
+async function refreshAuthorizedTransactions() {
+ if (!personId || !auth.currentUser) return;
+ await refreshAuthorizedTransactions();
+}
+
 function render(){
  const title=document.getElementById("personTitle"),c=document.getElementById("detailTransactions");
  if(!personId||!person){title.textContent="Ledger unavailable";c.innerHTML='<p class="empty">No ledger is available for this login.</p>';return;}
@@ -79,3 +84,5 @@ async function loadAuthorizedLedger() {
 }
 window.addEventListener("mypayments-person-authenticated", loadAuthorizedLedger);
 authReady.then(user=>{if(user)loadAuthorizedLedger();}).catch(console.error);
+
+window.addEventListener("focus", () => { if (ledgerLoadStarted) refreshAuthorizedTransactions(); });
