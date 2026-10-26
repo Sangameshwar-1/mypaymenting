@@ -1,4 +1,4 @@
-import { db, ref, onValue, authReady, accessClaims, signOut, auth } from "./firebase.js";
+import { db, ref, onValue, authReady, accessClaims, getPersonTransactions, signOut, auth } from "./firebase.js";
 
 let personId = null;
 let person = null;
@@ -17,6 +17,18 @@ function total(t){const base=Number(t.amount)||0;return base+chargesOf(t).reduce
 function chargeText(c,base){const v=chargeValue(c,base);return c.kind==="percentage"?formatMoney(c.value)+"% "+(c.included?"included":"added")+" = ₹"+formatMoney(v):"₹"+formatMoney(v);}
 function fallbackTime(t){if(t.time)return t.time;if(t.createdAt){const d=new Date(t.createdAt);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}return "00:00";}
 function sortValue(t){return (t.date||"0000-00-00")+"T"+(t.time||"00:00");}
+
+async function refreshAuthorizedTransactions() {
+ if (!personId || !auth.currentUser) return;
+ try {
+   const result = await getPersonTransactions(personId);
+   transactions = result.transactions || {};
+   render();
+ } catch (error) {
+   console.error("Could not load authorized transactions:", error);
+   document.getElementById("detailTransactions").innerHTML = '<p class="empty">Could not load this ledger. Please refresh and try again.</p>';
+ }
+}
 
 function render(){
  const title=document.getElementById("personTitle"),c=document.getElementById("detailTransactions");
@@ -68,7 +80,9 @@ async function loadAuthorizedLedger() {
    return;
  }
  onValue(ref(db,"mypayments/people/"+personId),s=>{person=s.val()||null;render();});
- onValue(ref(db,"mypayments/ledgers/"+personId+"/transactions"),s=>{transactions=s.val()||{};render();});
+ await refreshAuthorizedTransactions();
 }
 window.addEventListener("mypayments-person-authenticated", loadAuthorizedLedger);
 authReady.then(user=>{if(user)loadAuthorizedLedger();}).catch(console.error);
+
+window.addEventListener("focus", () => { if (ledgerLoadStarted) refreshAuthorizedTransactions(); });
