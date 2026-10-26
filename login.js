@@ -60,6 +60,7 @@ form?.addEventListener("submit", async (event) => {
       if (!location.pathname.endsWith("person.html")) {
         location.replace("person.html");
       } else {
+        ensureLogoutButton();
         document.body.classList.add("authenticated");
         document.getElementById("loginGate")?.setAttribute("hidden", "");
         window.dispatchEvent(new CustomEvent("mypayments-person-authenticated", { detail: { personId: result.claims.personId } }));
