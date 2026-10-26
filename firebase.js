@@ -36,11 +36,6 @@ async function getPersonTransactions(personId) {
   const response = await call({ personId });
   return response.data;
 }
-async function getPersonTransactions(personId) {
-  const call = httpsCallable(functions, "getPersonTransactions");
-  const response = await call({ personId });
-  return response.data;
-}
 async function setPersonPin(personId, pin) {
   const call = httpsCallable(functions, "setPersonPin");
   const response = await call({ personId, pin });
