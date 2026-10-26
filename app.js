@@ -1,4 +1,4 @@
-import { db, ref, push, set, update, remove, onValue, authReady, accessClaims } from "./firebase.js";
+import { db, ref, push, set, update, remove, onValue, authReady, accessClaims, auth } from "./firebase.js";
 
 let people = {};
 let transactions = {};
@@ -410,8 +410,8 @@ document.getElementById("filterPerson").addEventListener("change", displayTransa
 let adminBooted = false;
 async function bootAdmin() {
   if (adminBooted) return;
-  const user = await authReady;
-  if (!user) return;
+  await authReady;
+  if (!auth.currentUser) return;
   const claims = await accessClaims();
   if (!claims?.admin) { location.replace("person.html"); return; }
   adminBooted = true;
