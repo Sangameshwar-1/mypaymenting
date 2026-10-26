@@ -1,46 +1,53 @@
-# Secure PIN access — deployment guide
+# Firebase-only email/password access (free Spark plan)
 
-## Data-preserving design
+This branch replaces PIN/Cloud Functions login with Firebase Authentication email/password sign-in. It is designed to keep the current Realtime Database records in place.
 
-This implementation uses the existing Realtime Database structure. **Do not run `scripts/migrate-ledgers.js` and do not copy, move, or delete existing transactions.** Transactions remain at `mypayments/transactions/{transactionId}`; people remain at `mypayments/people/{personId}`.
+## Important: do not deploy blindly
 
-- Admin PIN: access and manage all people and transactions.
-- Personal PIN: read-only access to the person's own profile and transactions.
-- PINs are verified by a trusted Firebase Cloud Function. Personal transaction data is filtered on the server, not in browser JavaScript.
-- The browser never receives PIN hashes. The admin can use **Set PIN** to create or reset a person's PIN.
-- The legacy shared transaction path is readable/writable directly only by an authenticated admin. Personal sessions retrieve their filtered records through `getPersonTransactions`.
+**No Firebase changes have been deployed by this repository change.** The current live site and database remain unchanged until you review and deploy the code/rules. Export a backup of the Realtime Database and current rules before changing rules.
 
-## Important status
+## What stays unchanged
 
-The PIN-access source changes are merged into `main`. The GitHub Pages workflow is configured to run on pushes to `main`, but confirm its latest run in GitHub Actions before assuming the website is updated. **Firebase Cloud Functions and Realtime Database rules have not been deployed as part of this repository change.** Until those are deployed and tested, do not assume PIN-based isolation is active for real payment data. GitHub Pages deployment alone does not activate the callable functions.
+- Existing people: `mypayments/people/{personId}`
+- Existing transactions: `mypayments/transactions/{transactionId}`
+- No migration, copying, or deletion of transaction records.
+- GitHub Pages remains the frontend host.
+- Firebase Authentication and Realtime Database are the only application backend services.
 
-No transaction migration is required. Existing transaction records should remain at `mypayments/transactions/{transactionId}`.
+## One-time Firebase Console setup
 
-## Firebase setup
+1. In Firebase Console for project `blood-7b054`, open **Authentication → Sign-in method** and enable **Email/Password**.
+2. Open **Authentication → Users**. Create one account for the admin and one account for each person who needs access. Use unique email addresses and strong passwords. Do not reuse the admin password.
+3. For each created account, copy its **UID** from Authentication → Users.
+4. Open **Realtime Database → Data**. Add role mappings under `security/access`:
+   - Admin UID: `security/access/ADMIN_UID/admin = true`
+   - Person UID: `security/access/PERSON_UID/personId = "EXACT_EXISTING_PERSON_ID"`
+   Use the existing person ID from `mypayments/people`; do not create a new person or move any payment records.
+5. Keep the `security/access` mapping private. The supplied rules allow users to read only their own mapping; they cannot edit role mappings through the app.
+6. Before deploying rules, verify that every personal UID maps to exactly one existing person ID, and that only the admin UID has `admin: true`.
 
-1. Export a backup from Firebase Console for project `blood-7b054` before making any Firebase changes. This is a precaution; the proposed code does not perform a data migration.
-2. Confirm Firebase Authentication and Realtime Database are enabled. PIN login uses Firebase custom tokens.
-3. Check that the Firebase project has the billing plan required for Cloud Functions.
-4. Clone this repository and check out the latest `main` branch. Install the Firebase CLI and authenticate with an account authorized to deploy Functions and Database Rules (`firebase login`). There is no committed `.firebaserc`, so specify the project ID explicitly in every deploy command.
-5. Run `npm install --prefix functions`.
-6. Run `node scripts/create-pin-credentials.js` in a local interactive terminal. Enter the intended admin PIN only in that terminal when prompted. The script stores a salted scrypt hash in an ignored local file; never commit or share the PIN, hash file, or service-account key.
-7. In the same terminal, run `firebase functions:secrets:set PIN_CREDENTIALS --project blood-7b054`. When prompted, paste the complete JSON contents of `pin-credentials.local.json` locally. Do not paste the PIN or JSON into chat, an issue, or a GitHub file. The expected JSON shape is `{ "admin": { "salt": "...", "hash": "..." } }`.
-8. Review the function code and deployment diff. Then deploy the callable functions: `firebase deploy --only functions:loginWithPin,functions:setPersonPin,functions:getPersonTransactions --project blood-7b054`.
-9. Open the repository's Actions page and confirm the **Deploy to GitHub Pages** workflow succeeded for the latest `main` commit. The workflow is configured to publish automatically; do not assume it succeeded without checking.
-10. Log in with the admin PIN and use **Set PIN** beside each person. Personal PINs must be 4–12 digits, unique, and different from the admin PIN. Share them privately.
-11. Deploy the reviewed Realtime Database rules with `firebase deploy --only database --project blood-7b054`. This changes access permissions, not transaction records. Do not deploy rules from a different branch or older version. Keep your exported rules backup so you can restore the previous access configuration if needed.
-12. Test with the admin PIN and at least two personal PINs after the functions and rules are deployed. Confirm each personal login sees only its own transactions, direct reads of the shared transactions path are denied to personal users, personal writes are denied, and the admin can still view and edit all existing records. If any check fails, stop using the site and restore the prior rules configuration while troubleshooting.
+## Deploying the database rules
 
-## Data layout (unchanged)
+Install Firebase CLI and sign in with an account that can administer project `blood-7b054`. From the repository root, review `database.rules.json` and run:
 
-- `mypayments/people/{personId}`: existing person profiles.
-- `mypayments/transactions/{transactionId}`: existing shared transaction records. This remains the canonical transaction collection; records are not migrated.
-- `security/pinCredentials/people/{personId}`: salted hashes for personal PINs, written by the trusted function. This is separate from payment records.
+```bash
+firebase deploy --only database --project blood-7b054
+```
 
-## Security notes
+This deploys access rules only; it does not change data. Do not run any migration script. If any rule test fails, restore your exported previous rules and stop using the app until access is fixed.
 
-- Realtime Database rules must enforce access; hiding other people's rows in JavaScript is not secure.
-- The `getPersonTransactions` function uses the authenticated person's claim to filter the existing shared transaction collection. It ignores a caller-supplied person ID for personal sessions.
-- PINs and service-account keys must never be committed to GitHub or pasted into chat.
-- The login function rate-limits repeated failures by source IP. Four-digit PINs are weak, so protect the admin PIN and consider enabling Firebase App Check and monitoring function usage.
-- No Firebase deployment or database modification is performed by this guide.
+## Verify before normal use
+
+1. Sign in as admin. Confirm the admin can list people and all existing transactions, add/edit/delete transactions, and edit people.
+2. Sign in as person A. Confirm only person A's profile and transactions are returned.
+3. Try person B's ledger URL while signed in as person A; it must not reveal person B's profile or transactions.
+4. Sign in as person B and repeat.
+5. Confirm personal accounts cannot write people or transactions and cannot read the entire transactions collection.
+6. Sign out and confirm the app returns to the login screen.
+
+## Limitations
+
+- This approach removes the old PIN interface. Users sign in with Firebase email/password.
+- Create/reset accounts in Firebase Console; this frontend does not create or reset Auth users.
+- Do not share the admin credentials. Do not make `mypayments/transactions` publicly readable.
+- Firebase Realtime Database rules must be deployed and tested before assuming isolation is active. The existing Cloud Functions files are no longer used by the email/password frontend but are left in the repository for now.
