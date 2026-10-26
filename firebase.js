@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getDatabase, ref, push, set as dbSet, update as dbUpdate, remove as dbRemove, onValue as dbOnValue } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithCustomToken, signOut, getIdTokenResult } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAHt06CtReHyQRip-QqEGILFjOWH5cI98c",
@@ -16,24 +17,44 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-
-// Authenticate first. Realtime Database rules can then safely use auth != null.
-const authReady = signInAnonymously(auth).then((credential) => {
-  console.log("Firebase anonymous auth ready. uid:", credential.user.uid);
-  return credential.user;
-}).catch((error) => {
-  console.error("Firebase anonymous authentication failed. Enable Anonymous sign-in in Firebase Console.", error);
-  throw error;
+const functions = getFunctions(app, "us-central1");
+const authReady = new Promise((resolve, reject) => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    unsubscribe();
+    resolve(user);
+  }, reject);
 });
 
-// These wrappers prevent any database read/write from happening before auth is ready.
-const set = (...args) => authReady.then(() => dbSet(...args));
-const update = (...args) => authReady.then(() => dbUpdate(...args));
-const remove = (...args) => authReady.then(() => dbRemove(...args));
-const onValue = (...args) => {
-  authReady.then(() => dbOnValue(...args)).catch((error) => {
+async function loginWithPin(pin) {
+  const loginCall = httpsCallable(functions, "loginWithPin");
+  const response = await loginCall({ pin });
+  await signInWithCustomToken(auth, response.data.token);
+  return getIdTokenResult(auth.currentUser, true);
+}
+async function setPersonPin(personId, pin) {
+  const call = httpsCallable(functions, "setPersonPin");
+  const response = await call({ personId, pin });
+  return response.data;
+}
+async function accessClaims() {
+  if (!auth.currentUser) return null;
+  return (await getIdTokenResult(auth.currentUser, true)).claims;
+}
+async function requireAuth() {
+  await authReady;
+  if (!auth.currentUser) throw new Error("Please sign in with your PIN first.");
+}
+const set = async (...args) => { await requireAuth(); return dbSet(...args); };
+const update = async (...args) => { await requireAuth(); return dbUpdate(...args); };
+const remove = async (...args) => { await requireAuth(); return dbRemove(...args); };
+const onValue = (databaseRef, callback, errorCallback) => {
+  authReady.then(() => {
+    if (!auth.currentUser) throw new Error("PIN login required.");
+    dbOnValue(databaseRef, callback, errorCallback);
+  }).catch((error) => {
     console.error("Firebase database listener could not start:", error);
+    if (errorCallback) errorCallback(error);
   });
 };
 
-export { db, auth, authReady, ref, push, set, update, remove, onValue };
+export { db, auth, authReady, ref, push, set, update, remove, onValue, loginWithPin, setPersonPin, accessClaims, signOut };

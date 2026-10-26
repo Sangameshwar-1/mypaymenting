@@ -1,11 +1,11 @@
-import { db, ref, push, set, update, remove, onValue } from "./firebase.js";
+import { db, ref, push, set, update, remove, onValue, authReady, accessClaims, auth, setPersonPin } from "./firebase.js";
 
 let people = {};
 let transactions = {};
 let editingTransactionId = null;
 
 const peopleRef = ref(db, "mypayments/people");
-const transactionsRef = ref(db, "mypayments/transactions");
+const ledgersRef = ref(db, "mypayments/ledgers");
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -193,6 +193,24 @@ window.addPerson = async function() {
   try { await set(push(peopleRef), { name }); input.value = ""; }
   catch (e) { alert(`Could not add person: ${e.message}`); }
 };
+window.changePersonPin = async function(id) {
+  const person = people[id];
+  if (!person) return;
+  const pin = prompt("Set a new 4–12 digit PIN for " + (person.name || "this person") + ".\nDo not reuse the admin PIN.");
+  if (pin === null) return;
+  if (!/^\\d{4,12}$/.test(pin)) return alert("PIN must contain 4–12 digits.");
+  if (pin === "1991") return alert("Please choose a PIN different from the admin PIN.");
+  const confirmPin = prompt("Re-enter the new PIN to confirm:");
+  if (confirmPin === null) return;
+  if (pin !== confirmPin) return alert("PINs do not match.");
+  try {
+    await setPersonPin(id, pin);
+    alert("PIN updated for " + (person.name || "this person") + ". Share it privately.");
+  } catch (e) {
+    alert(e.code === "functions/already-exists" ? "That PIN is already assigned to another person." : "Could not update PIN: " + (e.message || "Unknown error"));
+  }
+};
+
 window.editPerson = async function(id) {
   const person = people[id]; if (!person) return;
   const name = prompt("Edit person name:", person.name || "");
@@ -208,13 +226,13 @@ window.deletePerson = async function(id) {
   try {
     const updates = {};
     updates[`mypayments/people/${id}`] = null;
-    Object.entries(transactions).forEach(([txId, t]) => { if (t.personId === id) updates[`mypayments/transactions/${txId}`] = null; });
+    updates[`mypayments/ledgers/${id}`] = null;
     await update(ref(db), updates);
   } catch (e) { alert(`Could not delete person: ${e.message}`); }
 };
 window.deleteTransaction = async id => {
   if (!confirm("Delete this transaction permanently?")) return;
-  try { await remove(ref(db, `mypayments/transactions/${id}`)); }
+  try { const t = transactions[id]; if (!t?.personId) throw new Error("Transaction not found."); await remove(ref(db, `mypayments/ledgers/${t.personId}/transactions/${id}`)); }
   catch (e) { alert(`Could not delete transaction: ${e.message}`); }
 };
 window.editTransaction = function(id) {
@@ -257,8 +275,11 @@ window.saveEditedTransaction = async function() {
   if (type === "other" && !otherType) return alert("Enter other type");
   if (platformSelect === "Other" && !otherPlatform) return alert("Enter other platform");
   try {
-    await update(ref(db, `mypayments/transactions/${editingTransactionId}`), {
-      personId: document.getElementById("editPerson").value,
+    const oldTransaction = transactions[editingTransactionId];
+    const nextPersonId = document.getElementById("editPerson").value;
+    const nextTransaction = {
+      ...oldTransaction,
+      personId: nextPersonId,
       date: document.getElementById("editDate").value,
       time: document.getElementById("editTime").value,
       type,
@@ -270,7 +291,13 @@ window.saveEditedTransaction = async function() {
       purpose: document.getElementById("editPurpose").value.trim(),
       description: document.getElementById("editDescription").value.trim(),
       charges: getEditCharges()
-    });
+    };
+    if (oldTransaction.personId !== nextPersonId) {
+      await set(ref(db, `mypayments/ledgers/${nextPersonId}/transactions/${editingTransactionId}`), nextTransaction);
+      await remove(ref(db, `mypayments/ledgers/${oldTransaction.personId}/transactions/${editingTransactionId}`));
+    } else {
+      await update(ref(db, `mypayments/ledgers/${nextPersonId}/transactions/${editingTransactionId}`), nextTransaction);
+    }
     closeEditModal();
   } catch (e) { alert(`Could not save changes: ${e.message}`); }
 };
@@ -300,7 +327,7 @@ function displayPeople() {
     const x = personTotals(id), balance = x.credit - x.debit;
     const d = document.createElement("div");
     d.className = "person";
-    d.innerHTML = `<div class="person-main" onclick="window.location.href='person.html?id=${encodeURIComponent(id)}'"><div class="person-name">${escapeHtml(p.name)}</div><div class="person-balance ${balance >= 0 ? "positive" : "negative"}">${balance >= 0 ? "Receivable" : "Payable"}: ₹${formatMoney(Math.abs(balance))}</div></div><div class="person-actions"><button type="button" class="small-btn" onclick="event.stopPropagation();window.editPerson('${id}')">Edit</button><button type="button" class="small-btn danger" onclick="event.stopPropagation();window.deletePerson('${id}')">Delete</button></div>`;
+    d.innerHTML = `<div class="person-main" onclick="window.location.href='person.html?id=${encodeURIComponent(id)}'"><div class="person-name">${escapeHtml(p.name)}</div><div class="person-balance ${balance >= 0 ? "positive" : "negative"}">${balance >= 0 ? "Receivable" : "Payable"}: ₹${formatMoney(Math.abs(balance))}</div></div><div class="person-actions"><button type="button" class="small-btn" onclick="event.stopPropagation();window.editPerson('${id}')">Edit</button><button type="button" class="small-btn" onclick="event.stopPropagation();window.changePersonPin('${id}')">Set PIN</button><button type="button" class="small-btn danger" onclick="event.stopPropagation();window.deletePerson('${id}')">Delete</button></div>`;
     c.appendChild(d);
   });
 }
@@ -398,8 +425,27 @@ document.getElementById("ledgerPdfBtn").addEventListener("click", () => exportTo
 document.getElementById("editModal").addEventListener("click", e => { if (e.target.id === "editModal") closeEditModal(); });
 document.getElementById("filterPerson").addEventListener("change", displayTransactions);
 
-onValue(peopleRef, snapshot => { people = snapshot.val() || {}; updatePersonDropdowns(); displayPeople(); displayTransactions(); updateDashboard(); });
-onValue(transactionsRef, snapshot => { transactions = snapshot.val() || {}; displayPeople(); displayTransactions(); updateDashboard(); });
+let adminBooted = false;
+async function bootAdmin() {
+  if (adminBooted) return;
+  await authReady;
+  if (!auth.currentUser) return;
+  const claims = await accessClaims();
+  if (!claims?.admin) { location.replace("person.html"); return; }
+  adminBooted = true;
+  document.body.classList.add("authenticated");
+  onValue(peopleRef, snapshot => { people = snapshot.val() || {}; updatePersonDropdowns(); displayPeople(); displayTransactions(); updateDashboard(); });
+  onValue(ledgersRef, snapshot => {
+    transactions = {};
+    const ledgers = snapshot.val() || {};
+    Object.entries(ledgers).forEach(([personId, ledger]) => {
+      Object.entries(ledger?.transactions || {}).forEach(([txId, tx]) => { transactions[txId] = { ...tx, personId: tx.personId || personId }; });
+    });
+    displayPeople(); displayTransactions(); updateDashboard();
+  });
+}
+window.addEventListener("mypayments-authenticated", bootAdmin);
+authReady.then(user => { if (user) bootAdmin(); }).catch(console.error);
 
 document.getElementById("transactionForm").addEventListener("submit", async event => {
   event.preventDefault();
@@ -415,7 +461,7 @@ document.getElementById("transactionForm").addEventListener("submit", async even
   if (type === "other" && !otherType) return alert("Enter other type");
   if (platform === "Other" && !otherPlatform) return alert("Enter other platform");
   try {
-    await set(push(transactionsRef), {
+    await set(push(ref(db, `mypayments/ledgers/${personId}/transactions`)), {
       personId,date,time,type,
       otherType: type === "other" ? otherType : "",
       amount,
