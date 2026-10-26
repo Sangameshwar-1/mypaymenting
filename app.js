@@ -197,7 +197,7 @@ window.changePersonPin = async function(id) {
   if (!person) return;
   const pin = prompt("Set a new 4–12 digit PIN for " + (person.name || "this person") + ".\nDo not reuse the admin PIN.");
   if (pin === null) return;
-  if (!/^\\d{4,12}$/.test(pin)) return alert("PIN must contain 4–12 digits.");
+  if (!/^\d{4,12}$/.test(pin)) return alert("PIN must contain 4–12 digits.");
   if (pin === "1991") return alert("Please choose a PIN different from the admin PIN.");
   const confirmPin = prompt("Re-enter the new PIN to confirm:");
   if (confirmPin === null) return;
@@ -221,11 +221,13 @@ window.editPerson = async function(id) {
 window.deletePerson = async function(id) {
   const person = people[id]; if (!person) return;
   const hasTransactions = Object.values(transactions).some(t => t.personId === id);
-  if (!confirm(hasTransactions ? "This person has transactions. Delete the person and all related transactions?" : "Delete this person permanently?")) return;
+  if (hasTransactions) {
+    return alert("This person has existing transactions. Reassign or remove them explicitly before deleting the person. No records were changed.");
+  }
+  if (!confirm("Delete this person profile? Existing ledger data, if any, will be preserved.")) return;
   try {
     const updates = {};
     updates[`mypayments/people/${id}`] = null;
-    updates[`mypayments/ledgers/${id}`] = null;
     await update(ref(db), updates);
   } catch (e) { alert(`Could not delete person: ${e.message}`); }
 };
