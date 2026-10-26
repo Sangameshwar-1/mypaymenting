@@ -31,6 +31,11 @@ async function loginWithPin(pin) {
   await signInWithCustomToken(auth, response.data.token);
   return getIdTokenResult(auth.currentUser, true);
 }
+async function getPersonTransactions(personId) {
+  const call = httpsCallable(functions, "getPersonTransactions");
+  const response = await call({ personId });
+  return response.data;
+}
 async function setPersonPin(personId, pin) {
   const call = httpsCallable(functions, "setPersonPin");
   const response = await call({ personId, pin });
@@ -57,4 +62,4 @@ const onValue = (databaseRef, callback, errorCallback) => {
   });
 };
 
-export { db, auth, authReady, ref, push, set, update, remove, onValue, loginWithPin, setPersonPin, accessClaims, signOut };
+export { db, auth, authReady, ref, push, set, update, remove, onValue, loginWithPin, setPersonPin, getPersonTransactions, accessClaims, signOut };
